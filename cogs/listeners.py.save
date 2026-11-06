@@ -1,0 +1,154 @@
+from nextcord import *
+from dotenv import load_dotenv
+import os
+from requests import get
+from nextcord.ext import commands
+import pymongo
+import random
+import requests
+import json
+import asyncio
+load_dotenv()
+mongodb = pymongo.MongoClient(os.getenv("MONGODB"))
+db = mongodb.femdom_cage
+class listeners(commands.Cog):
+    def __init__(self, client) -> None:
+        self.client = client
+    @commands.Cog.listener("on_message")
+    async def on_level_up(self,message):
+        
+        if db.options.find_one({"guild": message.guild.id, "levels": True}):
+            color = db.custom.find_one({"type": "color", "guild": message.guild.id})
+            c = color['string']
+            if "0x" not in c:
+                if "#" not in c:
+                    c = "0x"+c
+                else:
+                    c = c.replace("#", "0x")
+            if message.author.bot:
+                return
+            if not message.guild:
+                return
+            if db.levels_sleep.find_one({"user": message.author.id, "guild": message.guild.id}):
+                return
+            result = db.levels.find_one({"member": message.author.id, "guild": message.guild.id})
+            if not result:
+                return
+            level = result['level']
+            exp = result['exp']
+            new_exp = exp+random.randrange(40, 100)
+            bal = 50
+            lvl_end = int(new_exp/100)
+            if level < lvl_end:
+                level = lvl_end
+                for i in range(1, level):
+                    bal += 50
+                db.balance.update_one({"guild": message.guild.id,"user": message.author.id}, {"$inc": {"balance": bal}}, upsert=True)
+                db.levels.update_one({"member": message.author.id, "guild": message.guild.id}, {"$set": {"level": level, "exp": 0}})
+                embed = Embed(title=f"Congratulations {message.author.mention}! Level up to level: {level}", color=0xffa4e4)
+
+                for doc in db.levels_reward.find({"guild": message.guild.id}):
+                    if len(doc) == 0:
+                        break
+                    if level == doc['level']:
+                        role = message.guild.get_role(doc['role'])
+                        await message.author.add_roles(role)
+                        embed.add_field(name=f"Level reward for level {level}", value=f"Congratulations! When you leveled up you earned: {role.mention}", inline=True)
+                        break
+                res = db.config.find_one({"value": "levels", "guild": message.guild.id})
+                chan = None
+                if res:
+
+                    chan = self.client.get_channel(res['channel'])
+                else:
+                    chan = message.channel
+                username = ""
+                if not message.author.nick:
+                        req = requests.get(f"https://discord.com/api/v10/users/{message.author.id}", headers={"Authorization": f"Bot {os.getenv('TOKEN')}"})
+                        js = json.loads(req.text)
+                        username = js['global_name']
+                        print (username)
+                else:
+                        username = message.author.nick
+                await chan.send(embed=embed)
+                db.levels_sleep.insert_one({"user": message.author.id, "guild": message.guild.id})
+                await asyncio.sleep(3)
+                db.levels_sleep.delete_many({"user": message.author.id, "guild": message.guild.id})
+                return
+            updated_exp = random.randrange(40, 100)
+            db.levels.update_one({"member": message.author.id, "guild": message.guild.id}, {"$inc": {"exp": updated_exp}})
+            db.levels_sleep.insert_one({"user": message.author.id, "guild": message.guild.id})
+            await asyncio.sleep(6)
+            db.levels_sleep.delete_many({"user": message.author.id, "guild": message.guild.id})
+        else:
+            return
+    @commands.Cog.listener("on_message")
+    async def on_message(self, message):
+        if message.author.bot:
+            return
+        if db.custom.find_one({"guild": message.guild.id}):
+            pass
+        else:
+            db.custom.insert_one({
+                "guild": message.guild.id,
+                "type": "gag_image",
+                "string": "https://cdn.discordapp.com/attachments/1138262120035778582/1186002728422473828/gagged.jpg",
+            })
+            db.custom.insert_one({
+                "guild": message.guild.id,
+                "type": "status_image",
+                "string": "https://cdn.discordapp.com/attachments/1138262120035778582/1186002728766419025/status.jpg",
+            })
+            db.custom.insert_one({
+                "guild": message.guild.id,
+                "type": "consent_image",
+                "string": "https://cdn.discordapp.com/attachments/1138262120035778582/1186002727801724978/consent.jpg",
+            })
+            db.custom.insert_one({"guild": message.guild.id,
+                                  "type": "color",
+                "string": "#ffa4e4"
+                                  })
+        if db.levels.find_one({"member": message.author.id, "guild": message.guild.id}):
+            pass
+        else:
+            db.levels.insert_one({"member": message.author.id, "guild": message.guild.id, "level": 1, "exp": 0})
+        if db.balance.find_one({"guild": message.guild.id, "user": message.author.id}):
+            pass
+        else:
+https://64.media.tumblr.com/4eeba1bb15436f0e019153c10295ca74/tumblr_mrio01VuBk1sai9mco1_500.gif              db.balance.insert_one({"user": message.author.id, "guild": message.guild.id, "balance": 100})
+        roles = message.author.roles
+        r = []
+        curr = [r.append(role.id) for role in roles]
+        result_d = db.config.find_one({"guild": message.guild.id, "key": "domme"})
+        result_sd = db.config.find_one({"guild": message.guild.id, "key": "switch domme lean"})
+        result_ss = db.config.find_one({"guild": message.guild.id, "key": "switch sub lean"})
+        result_s = db.config.find_one({"guild": message.guild.id, "key": "switch"})
+        
+        if db.options.find_one({"guild": message.guild.id, "bdsm": True}):
+            if db.config.find_one({"guild": message.guild.id, "key": "max subs"}):
+                return
+            else:
+                db.config.insert_one({"guild": message.guild.id, "key": "max subs", "value": 4})
+            if result_d['value'] in r or result_s['value'] in r or result_sd['value'] in r or result_ss['value'] in r:
+                if db.claims.find_one({"guild": message.guild.id, "domme": message.author.id}):
+                    return
+                db.claims.insert_one({"guild": message.guild.id, "domme": message.author.id, "submissives": []})
+            else:
+                return
+    @commands.Cog.listener("on_guild_join")
+    async def check_blacklist(self, guild):
+        result = db.blacklist.find_one({"guild": guild.id})
+        if result:
+            await guild.owner.send(embed=Embed(title="You are on the blacklist!", description=f"You are on the blacklist for {result['reason']}. if you feel this is an error, please submit a ticket @ The {self.client.user.name} Support Server.", color=0xffa4e4))
+            await guild.leave()
+        else:
+            await guild.system_channel.send(embed=Embed(description=f"Hello! I am <@{self.client.user.id}>\r\nTo get started, please refer to our ``/config bdsm`` and ``/set channel``, if you struggle using the commands ``/settings enable``  it'll allow you to use the gag, prison, ownership and more commands!\r\n For more commands please use ``/commands``!", color=0xffa4e4))    
+    @commands.Cog.listener("on_message")
+    async def check_server_currency(self, message):
+        if db.currency.find_one({"guild": message.guild.id}):
+            return
+        else:
+            db.currency.update_one({"guild": message.guild.id}, {"$set": {"result": "<:ballgag:1138554691597373510>"}}, upsert=True)    
+    
+def setup(client):
+    client.add_cog(listeners(client))
